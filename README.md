@@ -82,3 +82,7 @@ Copy `.env.example` to `.env` at the repo root. Spotify and Firebase vars are op
 ## Original course repo
 
 Forked from CS 222 team project `fa25-fa25-team045` (GitHub Classroom).
+
+## Engineering workflow
+
+See [engineering setup, validation and known blockers](docs/engineering-control-plane.md) and [agent instructions](AGENTS.md). Canonical validation: `make check` after the documented dependency setup.
