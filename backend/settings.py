@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -23,10 +24,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-o_xiq&ikf=*@p@==xousani00hy%!=-c=!t77*9@5%h#x0sbvw'
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "local-demo-only-not-for-deployment-signing-key"
+    else:
+        raise ImproperlyConfigured("Set SECRET_KEY or explicitly enable DEBUG for local development.")
+if not DEBUG and (len(SECRET_KEY) < 32 or SECRET_KEY.startswith("local-demo")):
+    raise ImproperlyConfigured("Production SECRET_KEY must be at least 32 characters and not a local key.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
@@ -48,6 +56,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'music',
 ]
@@ -81,9 +90,10 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
-FRONTEND_URL = "http://127.0.0.1:8080"
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:8080")
 
-# Database — SQLite for local dev (see README for production options)
+# Database — SQLite for the portfolio/local workflow.
+DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
@@ -97,7 +107,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
         'OPTIONS': {
-            'min_length': 4,  # Reduced from default 8 for development
+            'min_length': 8,  # Reduced from default 8 for development
         }
     },
 ]
@@ -184,4 +194,4 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # Allow all origins in development (remove in production)
-CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOW_ALL_ORIGINS = False

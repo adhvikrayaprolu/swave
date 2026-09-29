@@ -1,84 +1,40 @@
 # Swave
+Discover music previews, save the songs you like, and build a persistent daily playlist.
 
-Swipe-based music discovery app from **CS 222 (UIUC)**. React + TypeScript frontend, Django REST API backend, iTunes search, optional Spotify connect, JWT auth, demo mode.
+## What it does
+Register or sign in with email, search for an artist or song, preview music, swipe like/pass, and generate a playlist from today's likes. Accounts have separate histories; failed saves keep the card available for retry. A clearly labeled demo uses simulated data without an account.
 
-**Repo:** https://github.com/adhvikrayaprolu/swave
+## Architecture and tech stack
+React/TypeScript, Vite, shadcn/Radix components, Zustand and TanStack Query sit above Django REST Framework and SQLite. JWT authenticates account APIs. `music/account_views.py` handles accounts, `catalog_views.py` handles catalog APIs, `services.py` owns transactional swipes and playlist creation, and `spotify_views.py` contains the optional Spotify integration. Spotify recommendations are exploratory metadata scoring, not a trained recommendation model.
 
-## Features
+## Quick start
+Requires Python 3.13, Node 22.23+ and npm. From the repository root:
 
-- Register / login with JWT
-- **Demo mode** — explore without an account
-- Swipe feed for music discovery
-- User profiles, likes, playlists
-- iTunes preview search (no API key required)
-- Optional Spotify OAuth for library / playlist export
-
-## Project structure
-
-```text
-swave/
-├── backend/          # Django project settings & URLs
-├── music/            # Main Django app (models, views, Spotify/iTunes)
-├── frontend/         # React + Vite + Tailwind UI
-├── manage.py
-├── requirements.txt
-└── .env.example
+```sh
+make setup
+make dev
 ```
+Open http://127.0.0.1:8080. Startup applies migrations and seeds four metadata-only sample tracks. Use Search to import actual iTunes previews; availability depends on the provider. SQLite persists locally in ignored `db.sqlite3`. Ctrl-C stops both servers. `make setup` creates `.env` from `.env.example` without overwriting an existing file.
 
-## Prerequisites
+## Configuration
+The local `.env` explicitly enables DEBUG. Deployment requires DEBUG=False and a private SECRET_KEY of at least 32 characters, plus appropriate hosts, HTTPS, secure cookies and CORS origins. Never deploy the local fallback key. The frontend defaults to http://127.0.0.1:8000; override VITE_API_URL using `frontend/.env.example` when needed.
 
-- Python 3.11+
-- Node.js 18+
-- npm
+Spotify client ID/secret/redirect URI are optional, server-side settings. OAuth state is checked and consumed once; external failures return safe errors. The Spotify screen remains an experimental integration requiring a configured provider app and approved scopes. Firebase is not required for the canonical account workflow.
 
-## Setup
-
-```bash
-cd swave
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python manage.py migrate
+## Testing
+```sh
+make check
 ```
+Backend tests cover account isolation, authentication, revoked refresh tokens, validation, idempotent playlists/search import, catalog exhaustion and provider failures. Frontend tests cover failed-save retries, refill failures and registration feedback. CI runs tests, type checking, lint and production build, without live provider credentials.
 
-Frontend:
+## API and data model
+`User` → `SwipeEvent` → `Track`; `User` → dated `Playlist` → ordered items. Playlist rebuilding is transactional and deduplicates repeated likes.
 
-```bash
-cd frontend
-npm install
-```
+- `/auth/register/`, `/auth/login/`, `/auth/refresh/`, `/auth/logout/`
+- `/auth/profile/`, `/api/feed/next`, `/catalog/search/`
+- `/api/event/swipe/`, `/likes/`, `/playlist/daily/build/`, `/playlist/daily/`
 
-## Run locally
+Private endpoints require a Bearer token. Provider search is bounded to 100 characters and ten results, with a ten-second timeout.
 
-Backend (port **8000**):
-
-```bash
-source .venv/bin/activate
-python manage.py runserver 127.0.0.1:8000
-```
-
-Frontend (port **8080**):
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open **http://127.0.0.1:8080** — use **Try Demo Mode** or register a new account.
-
-API base URL is `http://localhost:8000` (see `frontend/src/api/client.ts`).
-
-## Environment
-
-Copy `.env.example` to `.env` at the repo root. Spotify and Firebase vars are optional for core swipe + iTunes demo flows.
-
-## Tech stack
-
-- **Frontend:** React 18, TypeScript, Vite, Tailwind, shadcn/ui, Zustand, TanStack Query
-- **Backend:** Django 5, DRF, Simple JWT, SQLite (local)
-- **Auth:** JWT + optional Firebase Google sign-in
-
-## Original course repo
-
-Forked from CS 222 team project `fa25-fa25-team045` (GitHub Classroom).
+## Design decisions and limitations
+SQLite and a single Django service keep local setup small. Music previews stay on provider servers; there is no audio download/storage. Local JWTs use browser storage, so an HTTPS deployment also needs a threat review and XSS defenses. The Spotify module still needs further decomposition and credential-backed end-to-end verification. Rate limits, production deployment, password reset and cross-timezone playlist semantics remain follow-up work. No claims are made about recommendation quality or performance gains.

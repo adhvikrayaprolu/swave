@@ -16,20 +16,6 @@ export const SwipeCard = ({ track, onSwipeLeft, onSwipeRight, onPlayPreview }: S
   const cardRef = useRef<HTMLDivElement>(null);
   const startPos = useRef({ x: 0, y: 0 });
 
-  useEffect(() => {
-    // Play preview when card is shown
-    if (onPlayPreview) {
-      onPlayPreview(track.previewUrl);
-    }
-
-    return () => {
-      // Stop on unmount
-      if (onPlayPreview) {
-        onPlayPreview(null);
-      }
-    };
-  }, [track.id, onPlayPreview]);
-
   const handleStart = (clientX: number, clientY: number) => {
     setIsDragging(true);
     startPos.current = { x: clientX - position.x, y: clientY - position.y };
@@ -95,7 +81,7 @@ export const SwipeCard = ({ track, onSwipeLeft, onSwipeRight, onPlayPreview }: S
       onTouchEnd={handleEnd}
     >
       <div
-        className="relative w-full max-w-md h-[600px] touch-none cursor-grab active:cursor-grabbing"
+        className="relative w-full max-w-md h-[420px] touch-none cursor-grab active:cursor-grabbing"
         style={{
           transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg)`,
           transition: isDragging ? 'none' : 'all 0.3s ease-out',
@@ -119,13 +105,13 @@ export const SwipeCard = ({ track, onSwipeLeft, onSwipeRight, onPlayPreview }: S
 
         {/* Card */}
         <div className="w-full h-full bg-card rounded-3xl shadow-card overflow-hidden">
-          <div className="relative h-3/4">
-            <img
+          <div className="relative h-2/3">
+            {track.artworkUrl ? <img
               src={track.artworkUrl}
               alt={`${track.title} by ${track.artist}`}
               className="w-full h-full object-cover"
               draggable={false}
-            />
+            /> : <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">No artwork available</div>}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           </div>
 

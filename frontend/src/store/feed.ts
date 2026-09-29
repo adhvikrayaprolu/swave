@@ -28,7 +28,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     try {
       const response = await api.feed.getNext();
       set((state) => ({
-        queue: [...state.queue, ...response.tracks],
+        queue: [...state.queue, ...response.tracks.filter(track => !state.queue.some(existing => existing.id === track.id))],
         loading: false,
       }));
     } catch (error) {

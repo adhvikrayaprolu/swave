@@ -1,249 +1,66 @@
 import * as mocks from './mocks';
-import type { 
-  FeedResponse, 
-  Playlist, 
-  PlaylistDetail, 
-  AuthProvider,
-  AuthResponse,
-  LoginRequest,
-  RegisterRequest,
-  User,
-  AuthTokens
-} from './types';
-
-// Base API URL - change this to your backend URL
-const API_BASE_URL = 'http://localhost:8000';
-
-// Token management
-const getStoredTokens = (): AuthTokens | null => {
-  const tokens = localStorage.getItem('auth_tokens');
-  return tokens ? JSON.parse(tokens) : null;
-};
-
-const setStoredTokens = (tokens: AuthTokens) => {
-  localStorage.setItem('auth_tokens', JSON.stringify(tokens));
-};
-
-const clearStoredTokens = () => {
-  localStorage.removeItem('auth_tokens');
-};
-
-// Helper function to make authenticated requests
-const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}) => {
-  const tokens = getStoredTokens();
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-
-  if (tokens?.access) {
-    headers['Authorization'] = `Bearer ${tokens.access}`;
+import type {FeedResponse, Track, AuthResponse, LoginRequest, RegisterRequest, User, AuthTokens, PlaylistDetail} from './types';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+function isDemo() {
+  try { return JSON.parse(localStorage.getItem('auth-storage') || '{}').state?.isDemoMode === true; }
+  catch { return false; }
+}
+function tokens(): AuthTokens | null {
+  try { return JSON.parse(localStorage.getItem('auth_tokens') || 'null'); }
+  catch { localStorage.removeItem('auth_tokens'); return null; }
+}
+const saveTokens = (value: AuthTokens) => localStorage.setItem('auth_tokens', JSON.stringify(value));
+export const clearTokens = () => localStorage.removeItem('auth_tokens');
+async function request(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
+  const token = tokens();
+  const headers = new Headers(options.headers);
+  headers.set('Content-Type', 'application/json');
+  if (token?.access) headers.set('Authorization', `Bearer ${token.access}`);
+  let response = await fetch(API_BASE_URL + path, {...options, headers});
+  if (response.status === 401 && token?.refresh && retry) {
+    const refresh = await fetch(API_BASE_URL + '/auth/refresh/', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh:token.refresh})});
+    if (!refresh.ok) { clearTokens(); throw new Error('Session expired. Sign in again.'); }
+    const result = await refresh.json();
+    saveTokens({...token, access:result.access, refresh:result.refresh || token.refresh});
+    response = await request(path, options, false);
   }
-
-  const response = await fetch(`${API_BASE_URL}${url}`, {
-    ...options,
-    headers,
-  });
-
-  // If token expired, try to refresh
-  if (response.status === 401 && tokens?.refresh) {
-    try {
-      const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh: tokens.refresh }),
-      });
-
-      if (refreshResponse.ok) {
-        const { access } = await refreshResponse.json();
-        const newTokens = { ...tokens, access };
-        setStoredTokens(newTokens);
-        
-        // Retry original request with new token
-        headers['Authorization'] = `Bearer ${access}`;
-        return fetch(`${API_BASE_URL}${url}`, {
-          ...options,
-          headers,
-        });
-      }
-    } catch (error) {
-      // Refresh failed, clear tokens
-      clearStoredTokens();
-      throw new Error('Authentication failed');
-    }
-  }
-
   return response;
-};
-
+}
+async function json<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await request(path,options);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || data.detail || Object.values(data).flat().join(' ') || 'Request failed');
+  return data as T;
+}
+const post = (body: unknown): RequestInit => ({method:'POST',body:JSON.stringify(body)});
+type BackendTrack = {id:number; external_id:string; title:string; artist:string; artwork?:string; album_art_url?:string; preview_url?:string};
+type DailyPlaylist = {id:number;name:string;items:Array<{track:BackendTrack}>};
+const track = (t:BackendTrack):Track => ({id:t.external_id || String(t.id),title:t.title,artist:t.artist,album:'',artworkUrl:t.album_art_url || t.artwork || '',previewUrl:t.preview_url || null});
+const playlist = (p:DailyPlaylist):PlaylistDetail => ({id:String(p.id),name:p.name,tracks:p.items.map(i=>track(i.track))});
 export const api = {
-  // Authentication endpoints
   auth: {
-    register: async (data: RegisterRequest): Promise<AuthResponse> => {
-      const response = await fetch(`${API_BASE_URL}/auth/register/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        if (error.password) {
-          throw new Error(`Password: ${error.password.join(', ')}`);
-        }
-        if (error.email) {
-          throw new Error(`Email: ${error.email.join(', ')}`);
-        }
-        if (error.username) {
-          throw new Error(`Username: ${error.username.join(', ')}`);
-        }
-        
-        throw new Error(error.detail || error.message || 'Registration failed');
-      }
-      
-      const result = await response.json();
-      setStoredTokens(result.tokens);
-      return result;
-    },
-
-    login: async (data: LoginRequest): Promise<AuthResponse> => {
-      const response = await fetch(`${API_BASE_URL}/auth/login/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || error.message || 'Login failed');
-      }
-      
-      const result = await response.json();
-      setStoredTokens(result.tokens);
-      return result;
-    },
-
-    logout: async (): Promise<void> => {
-      const tokens = getStoredTokens();
-      if (tokens?.refresh) {
-        try {
-          await fetch(`${API_BASE_URL}/auth/logout/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh: tokens.refresh }),
-          });
-        } catch (error) {
-          console.error('Logout error:', error);
-        }
-      }
-      clearStoredTokens();
-    },
-
-    verifyFirebaseToken: async (firebaseToken: string): Promise<AuthResponse> => {
-      const response = await fetch(`${API_BASE_URL}/auth/verify-firebase/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firebase_token: firebaseToken }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || error.detail || 'Token verification failed');
-      }
-      
-      const result = await response.json();
-      setStoredTokens(result.tokens);
-      return result;
-    },
-
-    getProfile: async (): Promise<User> => {
-      const response = await makeAuthenticatedRequest('/auth/profile/');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch profile');
-      }
-      
-      return response.json();
-    },
-
-    updateProfile: async (data: Partial<User>): Promise<User> => {
-      const response = await makeAuthenticatedRequest('/auth/profile/update/', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
-      }
-      
-      return response.json();
-    },
-
-    // Future OAuth integration
-    connectProvider: async (provider: AuthProvider): Promise<{ ok: true }> => 
-      mocks.mockAuthConnect(provider),
-    refreshTaste: async (): Promise<{ ok: true }> => mocks.mockRefreshTaste(),
+    login: async (data:LoginRequest) => { const result=await json<AuthResponse>('/auth/login/',post(data)); saveTokens(result.tokens); return result; },
+    register: async (data:RegisterRequest) => { const result=await json<AuthResponse>('/auth/register/',post(data)); saveTokens(result.tokens); return result; },
+    logout: async () => { const token=tokens(); try { if(token?.refresh) await json('/auth/logout/',post({refresh:token.refresh})); } finally { clearTokens(); } },
+    getProfile: () => json<User>('/auth/profile/'),
+    updateProfile: (data:Partial<User>) => json<User>('/auth/profile/update/',{method:'PUT',body:JSON.stringify(data)}),
   },
-
   feed: {
-    getNext: async (): Promise<FeedResponse> => {
-      const res = await fetch(`${API_BASE_URL}/api/feed/next`);
-      if (!res.ok) {
-        return mocks.mockFetchNextFeed();
-      }
-      const data = await res.json() as {
-        batch_id: string | null;
-        clips: Array<{
-          id: string | number;
-          title: string;
-          artist: string;
-          album_art_url: string | null;
-          preview_url: string | null;
-          provider?: string | null;
-          provider_track_id?: string | null;
-        }>;
-      };
-  
-      return {
-        batchId: data.batch_id ?? null,
-        tracks: data.clips.map(c => ({
-          id: String(c.id),
-          title: c.title,
-          artist: c.artist,
-          album: '', 
-          artworkUrl: c.album_art_url ?? '',
-          previewUrl: (c.preview_url ?? '') || null,
-        })),
-      };
+    getNext: async ():Promise<FeedResponse> => {
+      if(isDemo()) return mocks.mockFetchNextFeed();
+      const result=await json<{batch_id:string|null;clips:Array<{id:string;title:string;artist:string;album_art_url:string;preview_url:string}>}>('/api/feed/next');
+      return {batchId:result.batch_id || '',tracks:result.clips.map(c=>({id:String(c.id),title:c.title,artist:c.artist,album:'',artworkUrl:c.album_art_url || '',previewUrl:c.preview_url || null}))};
     },
   },
-  
+  catalog: {search: (query:string) => json<{imported:number}>('/catalog/search/',post({query}))},
   events: {
-    save: async (trackId: string, type: 'like' | 'reject'): Promise<void> => {
-      const body = JSON.stringify({
-        track_id: trackId,
-        direction: type === 'like' ? 'right' : 'left',
-        batch_id: null,
-      });
-  
-      const res = await makeAuthenticatedRequest(`/api/event/swipe/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      });
-  
-      if (!res.ok) {
-        // Swipe events are non-critical, fail silently
-      }
+    save: async (trackId:string,type:'like'|'reject') => {
+      if(isDemo()) return mocks.mockSaveEvent(trackId,type);
+      await json('/api/event/swipe/',post({track_id:trackId,direction:type==='like'?'right':'left',played_ms:0}));
     },
-  },  
-  
-  // Playlist endpoints
+  },
   playlists: {
-    list: (): Promise<Playlist[]> => mocks.mockListPlaylists(),
-    get: (id: string): Promise<PlaylistDetail> => mocks.mockGetPlaylist(id),
-    generateDaily: (): Promise<PlaylistDetail> => mocks.mockGenerateDailyPlaylist(),
-    export: (id: string): Promise<{ ok: true }> => mocks.mockExportPlaylist(id),
+    generateDaily: async ():Promise<PlaylistDetail> => isDemo() ? mocks.mockGenerateDailyPlaylist() : playlist(await json<DailyPlaylist>('/playlist/daily/build/',post({}))),
+    getDaily: async ():Promise<PlaylistDetail> => isDemo() ? mocks.mockGetPlaylist('daily-mix') : playlist(await json<DailyPlaylist>('/playlist/daily/')),
   },
 };

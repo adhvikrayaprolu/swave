@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import {toast as notify} from 'sonner';
 
 interface UIState {
   toastMessage: string | null;
@@ -16,6 +17,7 @@ export const useUIStore = create<UIState>((set) => ({
   networkError: false,
   
   toast: (message) => {
+    notify(message);
     set({ toastMessage: message });
     setTimeout(() => set({ toastMessage: null }), 3000);
   },

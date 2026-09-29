@@ -24,13 +24,12 @@ from .views import (
     spotify_login,
     spotify_callback,
     spotify_sync_likes, 
-    spotify_test_playlist,
-    spotify_test_playlist_browser,
     spotify_likes_debug,
 )
 
 urlpatterns = [
     path("test-itunes/", test_itunes),
+    path("catalog/search/", views.search_catalog),
 
     # Authentication
     path("auth/register/", register, name="register"),
@@ -61,8 +60,6 @@ urlpatterns = [
     path("auth/spotify/login", spotify_login, name="spotify_login"),
     path("auth/spotify/callback", spotify_callback, name="spotify_callback"),
     path("api/spotify/sync-likes", spotify_sync_likes, name="spotify_sync_likes"),
-    path("spotify/test-playlist/", spotify_test_playlist),
-    path("spotify/test-playlist-browser/", spotify_test_playlist_browser),
     path("api/spotify/liked-debug", spotify_likes_debug, name="spotify_likes_debug"),
     path("api/spotify/recommend-next", views.spotify_recommend_next),
 
