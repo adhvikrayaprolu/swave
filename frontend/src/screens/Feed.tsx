@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, LogOut, User } from 'lucide-react';
 
 export const Feed = () => {
-  const { queue, loading, error, fetchIfLow, consumeTop, reset } = useFeedStore();
+  const { queue, loading, error, fetchIfLow, consumeTop, reset, setExternalQueue } = useFeedStore();
   const { user, logout, isDemoMode } = useAuthStore();
   const toast = useUIStore((state) => state.toast);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -27,7 +27,7 @@ export const Feed = () => {
   const [searching,setSearching]=useState(false);
   const search = async () => {
     setSearching(true);
-    try { const result=await api.catalog.search(query); reset(); await fetchIfLow(); toast(`Imported ${result.imported} tracks`); }
+    try { const result=await api.catalog.search(query); setExternalQueue(result.tracks); toast(result.tracks.length ? `Found ${result.imported} tracks` : `No results for ${query.trim()}`); }
     catch(error) { toast(error instanceof Error ? error.message : 'Search failed'); }
     finally { setSearching(false); }
   };

@@ -174,4 +174,7 @@ def search_catalog(request):
                 "album_art_url": result["artwork"], "provider": "itunes",
                 "provider_track_id": result["external_id"], "duration_ms": result["duration_ms"],
             })
-    return Response({"imported": len(results)})
+    clips = [{"id": result["external_id"], "title": result["title"], "artist": result["artist"],
+              "album_art_url": result["artwork"] or "", "preview_url": result["preview_url"] or ""}
+             for result in results]
+    return Response({"imported": len(results), "clips": clips})

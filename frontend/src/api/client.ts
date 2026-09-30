@@ -34,6 +34,8 @@ async function json<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 const post = (body: unknown): RequestInit => ({method:'POST',body:JSON.stringify(body)});
 type BackendTrack = {id:number; external_id:string; title:string; artist:string; artwork?:string; album_art_url?:string; preview_url?:string};
+type CatalogClip = {id:string;title:string;artist:string;album_art_url:string;preview_url:string};
+const catalogTrack = (c:CatalogClip):Track => ({id:String(c.id),title:c.title,artist:c.artist,album:'',artworkUrl:c.album_art_url || '',previewUrl:c.preview_url || null});
 type DailyPlaylist = {id:number;name:string;items:Array<{track:BackendTrack}>};
 const track = (t:BackendTrack):Track => ({id:t.external_id || String(t.id),title:t.title,artist:t.artist,album:'',artworkUrl:t.album_art_url || t.artwork || '',previewUrl:t.preview_url || null});
 const playlist = (p:DailyPlaylist):PlaylistDetail => ({id:String(p.id),name:p.name,tracks:p.items.map(i=>track(i.track))});
@@ -49,10 +51,13 @@ export const api = {
     getNext: async ():Promise<FeedResponse> => {
       if(isDemo()) return mocks.mockFetchNextFeed();
       const result=await json<{batch_id:string|null;clips:Array<{id:string;title:string;artist:string;album_art_url:string;preview_url:string}>}>('/api/feed/next');
-      return {batchId:result.batch_id || '',tracks:result.clips.map(c=>({id:String(c.id),title:c.title,artist:c.artist,album:'',artworkUrl:c.album_art_url || '',previewUrl:c.preview_url || null}))};
+      return {batchId:result.batch_id || '',tracks:result.clips.map(catalogTrack)};
     },
   },
-  catalog: {search: (query:string) => json<{imported:number}>('/catalog/search/',post({query}))},
+  catalog: {search: async (query:string) => {
+    const result = await json<{imported:number;clips:CatalogClip[]}>('/catalog/search/',post({query}));
+    return {imported:result.imported,tracks:result.clips.map(catalogTrack)};
+  }},
   events: {
     save: async (trackId:string,type:'like'|'reject') => {
       if(isDemo()) return mocks.mockSaveEvent(trackId,type);

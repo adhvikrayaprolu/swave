@@ -100,7 +100,10 @@ class MusicFlowTests(APITestCase):
         provider.assert_not_called()
         provider.return_value=[{'external_id':'itunes-1','title':'Song','artist':'Artist','preview_url':'https://example.test/preview','artwork':'','duration_ms':30000}]
         for _ in range(2):
-            self.assertEqual(self.client.post('/catalog/search/',{'query':'Song'},format='json').data,{'imported':1})
+            response = self.client.post('/catalog/search/',{'query':'Song'},format='json')
+            self.assertEqual(response.data['imported'],1)
+            self.assertEqual(response.data['clips'],[{'id':'itunes-1','title':'Song','artist':'Artist','album_art_url':'','preview_url':'https://example.test/preview'}])
+            self.assertNotIn(self.track.external_id,[clip['id'] for clip in response.data['clips']])
         self.assertEqual(Track.objects.filter(external_id='itunes-1').count(),1)
         self.assertEqual(Track.objects.get(external_id='itunes-1').preview_url,'https://example.test/preview')
 
