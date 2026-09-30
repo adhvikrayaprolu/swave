@@ -12,7 +12,7 @@ Integration awaiting human review: [https://github.com/adhvikrayaprolu/swave/pul
 - [#10](https://github.com/adhvikrayaprolu/swave/issues/10) — verified implementation; blocked from duplicate agent selection pending merge.
 
 ## Remaining work
-None beyond integration review; do not invent another task.
+- [#11](https://github.com/adhvikrayaprolu/swave/issues/11) — P2 offline contract tests for existing optional Spotify routes; blocked until integration merge.
 
 See the current issue bodies for partial implementation, dependencies and human approval boundaries. No live credential rotation, production migration or deployment was performed.
 
