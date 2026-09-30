@@ -3,12 +3,15 @@ import { useFeedStore } from '@/store/feed';
 import { useUIStore } from '@/store/ui';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/api/client';
+import type {PlaylistDetail} from '@/api/types';
+import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import { SwipeCard } from '@/components/SwipeCard';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, LogOut, User } from 'lucide-react';
 
 export const Feed = () => {
-  const { queue, loading, fetchIfLow, consumeTop } = useFeedStore();
+  const { queue, loading, error, fetchIfLow, consumeTop, reset, setExternalQueue } = useFeedStore();
   const { user, logout, isDemoMode } = useAuthStore();
   const toast = useUIStore((state) => state.toast);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -18,16 +21,22 @@ export const Feed = () => {
   const [swipeCount, setSwipeCount] = useState(0);
   const [playlistBusy, setPlaylistBusy] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
-  const [playlistData, setPlaylistData] = useState<any | null>(null);
+  const [playlistData, setPlaylistData] = useState<PlaylistDetail | null>(null);
 
-  const API_BASE =
-  (import.meta as any).env?.VITE_API_URL || 'http://127.0.0.1:8000';
-
-
+  const [query,setQuery]=useState('');
+  const [searching,setSearching]=useState(false);
+  const search = async () => {
+    setSearching(true);
+    try { const result=await api.catalog.search(query); setExternalQueue(result.tracks); toast(result.tracks.length ? `Found ${result.imported} tracks` : `No results for ${query.trim()}`); }
+    catch(error) { toast(error instanceof Error ? error.message : 'Search failed'); }
+    finally { setSearching(false); }
+  };
+  const searchForm = !isDemoMode && <form onSubmit={e=>{e.preventDefault();void search();}} className="flex gap-2 max-w-md mx-auto p-4"><Input aria-label="Search music" placeholder="Search artist or song" value={query} onChange={e=>setQuery(e.target.value)} maxLength={100} required/><Button disabled={searching}>{searching?'Searching…':'Search'}</Button></form>;
 
   const handleLogout = async () => {
     try {
       await logout();
+      reset();
       toast('Logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
@@ -37,8 +46,8 @@ export const Feed = () => {
 
   useEffect(() => {
     if (!isDemoMode && !user) return;
-    if (queue.length === 0) fetchIfLow();
-  }, [fetchIfLow, queue.length, user, isDemoMode]);
+    void fetchIfLow();
+  }, [fetchIfLow, user, isDemoMode]);
 
 
 
@@ -57,7 +66,6 @@ export const Feed = () => {
     }
 
     if (!url) {
-      toast('No preview available for this track');
       return;
     }
 
@@ -98,17 +106,12 @@ export const Feed = () => {
   const handleGeneratePlaylist = async () => {
     setPlaylistBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/playlist/daily/build/`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
-      const data = await res.json();
-
+      const data = await api.playlists.generateDaily();
       setPlaylistData(data);
       setPlaylistOpen(true);
-    } catch (e: any) {
-      toast(e?.message || 'Failed to generate playlist');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to generate playlist');
+
     } finally {
       setPlaylistBusy(false);
     }
@@ -128,13 +131,23 @@ export const Feed = () => {
     }
   };
 
+  const [saving, setSaving] = useState(false);
   const handleSwipe = async (type: 'like' | 'reject') => {
-    consumeTop(async (track) => {
-      await api.events.save(track.id, type);
-      setSwipeCount((c) => c + 1);
-      toast(type === 'like' ? '❤️ Liked!' : '✕ Passed');
-    });
+    if (saving) return;
+    setSaving(true);
+    try {
+      await consumeTop(async (track) => {
+        await api.events.save(track.id, type);
+        setSwipeCount((c) => c + 1);
+        toast(type === 'like' ? 'Liked!' : 'Passed');
+      });
+    } catch (error) { toast(error instanceof Error ? error.message : 'Could not save swipe. Try again.'); }
+    finally { setSaving(false); }
   };
+  useEffect(() => () => {
+    audioRef.current?.pause();
+    if (progressInterval.current) clearInterval(progressInterval.current);
+  }, []);
 
   if (loading && queue.length === 0) {
     return (
@@ -149,8 +162,8 @@ export const Feed = () => {
       <div className="min-h-screen flex flex-col bg-background">
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold text-foreground">No more tracks!</h2>
-            <p className="text-muted-foreground">Check back later for new recommendations</p>
+            <h2 className="text-2xl font-bold text-foreground">{error ? "Could not load tracks" : "No more tracks"}</h2>
+            <p role="status" className="text-muted-foreground">{error || "Search for music to add previews to your catalog."}</p><Button onClick={() => void fetchIfLow()}>Retry</Button><Button variant="outline" onClick={handleLogout}>Logout</Button>{searchForm}<Button onClick={handleGeneratePlaylist} disabled={playlistBusy}>Generate Playlist</Button><Dialog open={playlistOpen} onOpenChange={setPlaylistOpen}><DialogContent><DialogTitle>Daily playlist</DialogTitle><DialogDescription>Your liked tracks</DialogDescription>{playlistData?.tracks.map(t=><p key={t.id}>{t.title} — {t.artist}</p>)}</DialogContent></Dialog>
           </div>
         </div>
       </div>
@@ -186,8 +199,9 @@ export const Feed = () => {
         <h1 className="text-2xl font-bold text-foreground">Discover</h1>
       </header>
 
+      {searchForm}
       {/* Card Stack */}
-      <div className="flex-1 relative px-4 pb-8">
+      <div className="relative h-[460px] px-4 pb-8">
         {queue.slice(0, 3).map((track, index) => (
           <div
             key={track.id}
@@ -208,13 +222,14 @@ export const Feed = () => {
               />
             )}
             {index > 0 && (
-              <div className="w-full max-w-md h-[600px] mx-auto bg-card rounded-3xl shadow-card" />
+              <div className="w-full max-w-md h-[420px] mx-auto bg-card rounded-3xl shadow-card" />
             )}
           </div>
         ))}
       </div>
 
-      {swipeCount >= 10 && (
+      <div className="flex flex-wrap justify-center gap-3 p-4"><Button variant="outline" disabled={saving} onClick={()=>void handleSwipe('reject')}>Pass</Button><Button disabled={saving} onClick={()=>void handleSwipe('like')}>{saving?'Saving…':'Like'}</Button><Button variant="outline" disabled={!queue[0]?.previewUrl} onClick={()=>handlePlayPreview(queue[0]?.previewUrl || null)}>Play preview</Button></div>
+      {(swipeCount > 0 || !isDemoMode) && (
       <div className="p-4 flex justify-center">
         <Button onClick={handleGeneratePlaylist} disabled={playlistBusy}>
           {playlistBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -223,40 +238,12 @@ export const Feed = () => {
       </div>
     )}
 
-      {playlistOpen && playlistData && (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="w-full max-w-md rounded-2xl bg-card border border-border p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold">Playlist created ✅</h3>
-            <p className="text-sm text-muted-foreground">{playlistData.name}</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => setPlaylistOpen(false)}>
-            Close
-          </Button>
-        </div>
-
-        <div className="mt-4 space-y-2 max-h-72 overflow-y-auto">
-          {(playlistData.items || []).map((it: any) => (
-            <div key={it.id} className="flex items-center gap-3 rounded-xl bg-muted/30 p-2">
-              <img
-                src={it.track?.album_art_url || ''}
-                className="w-10 h-10 rounded-lg object-cover"
-              />
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{it.track?.title}</div>
-                <div className="text-xs text-muted-foreground truncate">{it.track?.artist}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <Dialog open={playlistOpen} onOpenChange={setPlaylistOpen}>
+        <DialogContent><DialogTitle>Daily playlist</DialogTitle><DialogDescription>{playlistData?.name || 'Your liked tracks'}</DialogDescription>
+          {!playlistData?.tracks.length && <p>No liked tracks yet. Like a song and try again.</p>}
+          <div className="max-h-72 overflow-y-auto space-y-2">{playlistData?.tracks.map(track => <div key={track.id} className="rounded-xl bg-muted p-3"><p className="font-medium">{track.title}</p><p>{track.artist}</p></div>)}</div>
+        </DialogContent>
+      </Dialog>
     </div>
-  )}
-
-
-    </div>
-    
-    
   );
 };

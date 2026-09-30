@@ -29,7 +29,7 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
     clearError();
     
     if (formData.password !== formData.password_confirm) {
-      // This should be handled by the backend, but we can show a quick validation
+      useAuthStore.setState({error: "Passwords do not match"});
       return;
     }
     
@@ -116,6 +116,7 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
                 variant="ghost"
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={isLoading}
               >
@@ -145,6 +146,7 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
                 variant="ghost"
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                aria-label={showConfirmPassword ? "Hide confirmation" : "Show confirmation"}
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 disabled={isLoading}
               >

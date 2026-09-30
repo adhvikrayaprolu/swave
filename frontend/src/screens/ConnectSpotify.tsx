@@ -8,8 +8,7 @@ import { useAuthStore } from '@/store/auth';
 
 
 
-const API_BASE =
-  (import.meta as any).env?.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 type LikedTrack = {
   id: string;
@@ -83,8 +82,8 @@ export const ConnectSpotify = () => {
       const data = await res.json();
       setTracks(data.tracks || []);
       setFeatures(data.meta_features || []);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load Spotify likes');
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : '') || 'Failed to load Spotify likes');
     } finally {
       setLoading(false);
     }
@@ -143,8 +142,8 @@ export const ConnectSpotify = () => {
       await loadProfile().catch(() => {});
       navigate('/');
 
-    } catch (err: any) {
-      setRecoError(err?.message || 'Failed to load recommendations');
+    } catch (err: unknown) {
+      setRecoError((err instanceof Error ? err.message : '') || 'Failed to load recommendations');
       setRecommended([]);
     } finally {
       setRecoLoading(false);

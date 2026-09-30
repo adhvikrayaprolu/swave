@@ -1,84 +1,42 @@
 # Swave
+Swipe through music previews, keep the tracks you like and build a playlist from your discovery history.
 
-Swipe-based music discovery app from **CS 222 (UIUC)**. React + TypeScript frontend, Django REST API backend, iTunes search, optional Spotify connect, JWT auth, demo mode.
+## Overview
+Swave helps listeners explore artists and songs through a like/pass feed rather than reproducing a streaming service. Account data is persisted; the separately labeled demo uses simulated data.
 
-**Repo:** https://github.com/adhvikrayaprolu/swave
+## Project Context
+Started as a CS 222 team project at UIUC. The current engineering pass reconciles authentication, persistent interactions, integration boundaries, tests and reproducible setup.
 
-## Features
+## Key Features
+- Email/password registration and JWT login.
+- iTunes catalog search, provider-hosted previews and accessible like/pass controls.
+- Persisted preferences and deduplicated daily playlists.
+- Retryable save/search failures and clear loading/empty states.
 
-- Register / login with JWT
-- **Demo mode** — explore without an account
-- Swipe feed for music discovery
-- User profiles, likes, playlists
-- iTunes preview search (no API key required)
-- Optional Spotify OAuth for library / playlist export
+## Architecture / Tech Stack
+React/TypeScript + Vite + shadcn/Radix + Zustand/TanStack Query → Django REST APIs → SQLite. `account_views.py` handles accounts, `catalog_views.py` catalog APIs and `services.py` transactional swipes/playlists. `spotify_views.py` is an optional experimental integration, not a prerequisite for discovery.
 
-## Project structure
-
-```text
-swave/
-├── backend/          # Django project settings & URLs
-├── music/            # Main Django app (models, views, Spotify/iTunes)
-├── frontend/         # React + Vite + Tailwind UI
-├── manage.py
-├── requirements.txt
-└── .env.example
+## Quick Start
+Python 3.13, Node 22.23+ and npm:
+```sh
+make setup
+make dev
 ```
+Open http://127.0.0.1:8080. The command migrates SQLite, seeds four metadata-only tracks, and starts the backend at 8000 and frontend at 8080. Search imports playable previews when the provider supplies them. Ctrl-C stops both servers. Setup preserves an existing `.env`.
 
-## Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- npm
-
-## Setup
-
-```bash
-cd swave
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python manage.py migrate
+## Validation / Tests
+```sh
+make check
 ```
+Django system/migration checks and tests; frontend behavior tests, typecheck, lint and build. Tests cover isolation, revoked tokens, provider errors, idempotent imports/playlists and failed-save recovery without Spotify credentials.
 
-Frontend:
+## Environment Variables
+Copying `.env.example` is handled by setup. Local `DEBUG=True` enables a development-only secret fallback. Production requires `DEBUG=False`, a private `SECRET_KEY` of at least 32 characters and reviewed hosts/CORS/HTTPS. Optional Spotify client credentials stay server-side. `VITE_API_URL` is documented in `frontend/.env.example`. Firebase is not needed for the canonical account workflow.
 
-```bash
-cd frontend
-npm install
-```
+## Project Structure
+`frontend/`: UI and client state; `music/`: models, migrations, services, views and tests; `backend/`: Django configuration; `scripts/dev.py`: paired server lifecycle.
 
-## Run locally
+## Current Status / Limitations
+Optional Spotify export/OAuth needs credential-backed verification and further service decomposition. Recommendations are heuristic metadata scoring, not a validated machine-learning model. No preview downloads are stored. Rate limits, production deployment and password reset remain explicit follow-up work; no performance gains are claimed.
 
-Backend (port **8000**):
-
-```bash
-source .venv/bin/activate
-python manage.py runserver 127.0.0.1:8000
-```
-
-Frontend (port **8080**):
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open **http://127.0.0.1:8080** — use **Try Demo Mode** or register a new account.
-
-API base URL is `http://localhost:8000` (see `frontend/src/api/client.ts`).
-
-## Environment
-
-Copy `.env.example` to `.env` at the repo root. Spotify and Firebase vars are optional for core swipe + iTunes demo flows.
-
-## Tech stack
-
-- **Frontend:** React 18, TypeScript, Vite, Tailwind, shadcn/ui, Zustand, TanStack Query
-- **Backend:** Django 5, DRF, Simple JWT, SQLite (local)
-- **Auth:** JWT + optional Firebase Google sign-in
-
-## Original course repo
-
-Forked from CS 222 team project `fa25-fa25-team045` (GitHub Classroom).
+See [AGENTS.md](AGENTS.md) and the GitHub readiness tracker before starting another improvement.

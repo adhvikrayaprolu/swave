@@ -7,8 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { useAuthStore } from "@/store/auth";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
 
 import { AuthScreen } from "./screens/AuthScreen";
 import { ConnectSpotify } from "./screens/ConnectSpotify";
@@ -42,29 +40,10 @@ const RequireAuth = ({ children }: { children: JSX.Element }) => {
 const queryClient = new QueryClient();
 
 const AppShell = () => {
-  const { isAuthenticated, loadProfile } = useAuthStore();
+  const { loadProfile } = useAuthStore();
 
-  // Listen to Firebase auth state changes
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          await loadProfile();
-        } catch (error) {
-          console.error('Failed to load profile:', error);
-        }
-      } else {
-        useAuthStore.setState({
-          firebaseUser: null,
-          user: null,
-          isAuthenticated: false,
-          isDemoMode: false,
-        });
-      }
-    });
+  useEffect(() => { void loadProfile(); }, [loadProfile]);
 
-    return () => unsubscribe();
-  }, [loadProfile]);
 
   return (
     <Routes>
