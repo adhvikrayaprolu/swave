@@ -1,40 +1,42 @@
 # Swave
-Discover music previews, save the songs you like, and build a persistent daily playlist.
+Swipe through music previews, keep the tracks you like and build a playlist from your discovery history.
 
-## What it does
-Register or sign in with email, search for an artist or song, preview music, swipe like/pass, and generate a playlist from today's likes. Accounts have separate histories; failed saves keep the card available for retry. A clearly labeled demo uses simulated data without an account.
+## Overview
+Swave helps listeners explore artists and songs through a like/pass feed rather than reproducing a streaming service. Account data is persisted; the separately labeled demo uses simulated data.
 
-## Architecture and tech stack
-React/TypeScript, Vite, shadcn/Radix components, Zustand and TanStack Query sit above Django REST Framework and SQLite. JWT authenticates account APIs. `music/account_views.py` handles accounts, `catalog_views.py` handles catalog APIs, `services.py` owns transactional swipes and playlist creation, and `spotify_views.py` contains the optional Spotify integration. Spotify recommendations are exploratory metadata scoring, not a trained recommendation model.
+## Project Context
+Started as a CS 222 team project at UIUC. The current engineering pass reconciles authentication, persistent interactions, integration boundaries, tests and reproducible setup.
 
-## Quick start
-Requires Python 3.13, Node 22.23+ and npm. From the repository root:
+## Key Features
+- Email/password registration and JWT login.
+- iTunes catalog search, provider-hosted previews and accessible like/pass controls.
+- Persisted preferences and deduplicated daily playlists.
+- Retryable save/search failures and clear loading/empty states.
 
+## Architecture / Tech Stack
+React/TypeScript + Vite + shadcn/Radix + Zustand/TanStack Query → Django REST APIs → SQLite. `account_views.py` handles accounts, `catalog_views.py` catalog APIs and `services.py` transactional swipes/playlists. `spotify_views.py` is an optional experimental integration, not a prerequisite for discovery.
+
+## Quick Start
+Python 3.13, Node 22.23+ and npm:
 ```sh
 make setup
 make dev
 ```
-Open http://127.0.0.1:8080. Startup applies migrations and seeds four metadata-only sample tracks. Use Search to import actual iTunes previews; availability depends on the provider. SQLite persists locally in ignored `db.sqlite3`. Ctrl-C stops both servers. `make setup` creates `.env` from `.env.example` without overwriting an existing file.
+Open http://127.0.0.1:8080. The command migrates SQLite, seeds four metadata-only tracks, and starts the backend at 8000 and frontend at 8080. Search imports playable previews when the provider supplies them. Ctrl-C stops both servers. Setup preserves an existing `.env`.
 
-## Configuration
-The local `.env` explicitly enables DEBUG. Deployment requires DEBUG=False and a private SECRET_KEY of at least 32 characters, plus appropriate hosts, HTTPS, secure cookies and CORS origins. Never deploy the local fallback key. The frontend defaults to http://127.0.0.1:8000; override VITE_API_URL using `frontend/.env.example` when needed.
-
-Spotify client ID/secret/redirect URI are optional, server-side settings. OAuth state is checked and consumed once; external failures return safe errors. The Spotify screen remains an experimental integration requiring a configured provider app and approved scopes. Firebase is not required for the canonical account workflow.
-
-## Testing
+## Validation / Tests
 ```sh
 make check
 ```
-Backend tests cover account isolation, authentication, revoked refresh tokens, validation, idempotent playlists/search import, catalog exhaustion and provider failures. Frontend tests cover failed-save retries, refill failures and registration feedback. CI runs tests, type checking, lint and production build, without live provider credentials.
+Django system/migration checks and tests; frontend behavior tests, typecheck, lint and build. Tests cover isolation, revoked tokens, provider errors, idempotent imports/playlists and failed-save recovery without Spotify credentials.
 
-## API and data model
-`User` → `SwipeEvent` → `Track`; `User` → dated `Playlist` → ordered items. Playlist rebuilding is transactional and deduplicates repeated likes.
+## Environment Variables
+Copying `.env.example` is handled by setup. Local `DEBUG=True` enables a development-only secret fallback. Production requires `DEBUG=False`, a private `SECRET_KEY` of at least 32 characters and reviewed hosts/CORS/HTTPS. Optional Spotify client credentials stay server-side. `VITE_API_URL` is documented in `frontend/.env.example`. Firebase is not needed for the canonical account workflow.
 
-- `/auth/register/`, `/auth/login/`, `/auth/refresh/`, `/auth/logout/`
-- `/auth/profile/`, `/api/feed/next`, `/catalog/search/`
-- `/api/event/swipe/`, `/likes/`, `/playlist/daily/build/`, `/playlist/daily/`
+## Project Structure
+`frontend/`: UI and client state; `music/`: models, migrations, services, views and tests; `backend/`: Django configuration; `scripts/dev.py`: paired server lifecycle.
 
-Private endpoints require a Bearer token. Provider search is bounded to 100 characters and ten results, with a ten-second timeout.
+## Current Status / Limitations
+Optional Spotify export/OAuth needs credential-backed verification and further service decomposition. Recommendations are heuristic metadata scoring, not a validated machine-learning model. No preview downloads are stored. Rate limits, production deployment and password reset remain explicit follow-up work; no performance gains are claimed.
 
-## Design decisions and limitations
-SQLite and a single Django service keep local setup small. Music previews stay on provider servers; there is no audio download/storage. Local JWTs use browser storage, so an HTTPS deployment also needs a threat review and XSS defenses. The Spotify module still needs further decomposition and credential-backed end-to-end verification. Rate limits, production deployment, password reset and cross-timezone playlist semantics remain follow-up work. No claims are made about recommendation quality or performance gains.
+See [AGENTS.md](AGENTS.md) and the GitHub readiness tracker before starting another improvement.

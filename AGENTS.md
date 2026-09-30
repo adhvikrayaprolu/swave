@@ -5,10 +5,10 @@ Discover music, express preferences and save personally relevant playlists.
 frontend/src: React/Vite/shadcn, Zustand and API client; music: Django models and currently monolithic views; backend: settings/URLs; SQLite and iTunes/optional Spotify/Firebase integrations.
 
 # Local Development
-Create .venv, install requirements.txt, npm ci --prefix frontend and copy .env.example. Backend migrate/run and frontend npm run dev are documented separately; backend cannot start until settings syntax is repaired. make check PYTHON=/absolute/path/to/.venv/bin/python deliberately fails at this blocker.
+Follow the verified root README workflow. Root Makefiles coordinate Python/React environments where present; Spring defaults to persistent local H2; Android needs JDK17 and an explicit SDK path. Do not use source-level credentials or mutate live Firebase.
 
 # Validation
-Canonical command: `make check`. See docs/engineering-control-plane.md for prerequisites and known gaps. A build with zero tests is not behavioral validation. Do not skip a failing check or claim hosted CI passed before a run exists.
+Canonical setup/run/check commands: `make setup; make dev; make check` (run as separate commands). See README for prerequisites. Behavioral tests are mandatory and CI runs them; do not reduce checks to syntax or zero-test builds. Provider tests use fakes or demo-gatherlink emulators.
 
 # Frontend Rules
 Reuse existing React design-system components and shadcn/ui where appropriate; use Figma MCP before substantial redesign. Preserve keyboard access and responsive layouts; test loading/error/empty states.
@@ -23,7 +23,7 @@ Add meaningful regression tests for the selected workflow, including failure/aut
 Read open GitHub issues as the work source. Branch from current main as codex/<issue>-<scope>; link the real issue in a draft PR, record validation and verification limits. Use Closes #N only when all criteria are met; issue closes on human merge, not when the draft opens. Never merge or push directly to main.
 
 # Do Not
-Do not commit secrets, migrate frameworks, change unrelated features, deploy, rotate credentials or mutate live cloud data. Do not treat unmerged local sprint branches as main. Before implementing overlapping work inspect the existing local branch listed in docs/engineering-control-plane.md and avoid duplicate PRs.
+Do not commit secrets, migrate frameworks, change unrelated features, deploy, rotate credentials or mutate live cloud data. Inspect open PRs before selecting an issue; the quality integration PR publishes earlier product and control-plane work. Never redo work already present in an active PR.
 
 # Issue Selection Rules
 1. Read the Portfolio readiness tracking meta issue; stop if complete.
