@@ -28,7 +28,7 @@ Open http://127.0.0.1:8080. The command migrates SQLite, seeds four metadata-onl
 ```sh
 make check
 ```
-Django system/migration checks and tests; frontend behavior tests, typecheck, lint and build. Tests cover isolation, revoked tokens, provider errors, idempotent imports/playlists and failed-save recovery without Spotify credentials.
+Django system/migration checks and tests; frontend behavior tests, typecheck, lint and build. Tests cover isolation, revoked tokens, provider errors, idempotent imports/playlists and failed-save recovery without Spotify credentials. Offline Spotify contracts in `music/test_spotify.py` cover browser-bound, single-use OAuth state, refresh, user isolation and the internal playlist-export helper; unexpected HTTP fails these tests. Run them alone with `.venv/bin/python manage.py test music.test_spotify`.
 
 ## Environment Variables
 Copying `.env.example` is handled by setup. Local `DEBUG=True` enables a development-only secret fallback. Production requires `DEBUG=False`, a private `SECRET_KEY` of at least 32 characters and reviewed hosts/CORS/HTTPS. Optional Spotify client credentials stay server-side. `VITE_API_URL` is documented in `frontend/.env.example`. Firebase is not needed for the canonical account workflow.
@@ -37,6 +37,6 @@ Copying `.env.example` is handled by setup. Local `DEBUG=True` enables a develop
 `frontend/`: UI and client state; `music/`: models, migrations, services, views and tests; `backend/`: Django configuration; `scripts/dev.py`: paired server lifecycle.
 
 ## Current Status / Limitations
-Optional Spotify export/OAuth needs credential-backed verification and further service decomposition. Recommendations are heuristic metadata scoring, not a validated machine-learning model. No preview downloads are stored. Rate limits, production deployment and password reset remain explicit follow-up work; no performance gains are claimed.
+Spotify OAuth and the internal playlist-export helper have offline contract coverage, but live Spotify remains unverified. Export has no public API/UI and is not atomic remotely: a failed track write may leave an empty playlist; writes are never automatically retried. Recommendations are heuristic metadata scoring, not a validated machine-learning model. No preview downloads are stored. Rate limits, production deployment and password reset remain explicit follow-up work; no performance gains are claimed.
 
 See [AGENTS.md](AGENTS.md) and the GitHub readiness tracker before starting another improvement.
