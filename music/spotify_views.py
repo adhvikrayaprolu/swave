@@ -189,6 +189,10 @@ def spotify_login(request):
 @provider_errors
 def spotify_callback(request):
     expected = request.session.pop('spotify_oauth_state', None)
+    if expected:
+        # SessionMiddleware skips saves on 5xx; consume state before provider I/O
+        # so a timeout or malformed response cannot make a callback replayable.
+        request.session.save()
     supplied = request.GET.get('state', '')
     if not expected or not secrets.compare_digest(expected, supplied):
         return Response({"error": "Invalid or expired OAuth state"}, status=400)
@@ -270,7 +274,9 @@ def _ensure_access_token(user):
     tok = ProviderToken.objects.filter(user=user, provider="spotify").first()
     if not tok:
         return None
-    if tok.expires_at <= timezone.now() + datetime.timedelta(seconds=30) and tok.refresh_token:
+    if tok.expires_at <= timezone.now() + datetime.timedelta(seconds=30):
+        if not tok.refresh_token:
+            return None
         basic = base64.b64encode(
             f"{settings.SPOTIFY_CLIENT_ID}:{settings.SPOTIFY_CLIENT_SECRET}".encode()
         ).decode()

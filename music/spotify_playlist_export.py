@@ -1,5 +1,4 @@
 import requests
-from django.utils import timezone
 from .models import ProviderToken
 
 
@@ -11,18 +10,21 @@ def get_spotify_token(user):
     Returns a valid Spotify access token for the user.
     Refreshes automatically using your existing logic (_ensure_access_token).
     """
-    from .views import _ensure_access_token
+    from .spotify_views import _ensure_access_token
 
     token = _ensure_access_token(user)
     if not token:
-        raise Exception("Spotify not connected for this user.")
+        raise ValueError("Spotify not connected for this user.")
 
     return token
 
 
 def create_spotify_playlist(user, name, track_uris):
     """
-    Creates a playlist in the user's Spotify account and adds tracks.
+    Creates a private playlist and adds tracks; provider failures propagate.
+
+    No automatic retries: a failed track write may leave an empty remote playlist.
+    This is an internal helper, not a public export API.
     """
     access_token = get_spotify_token(user)
     headers = {
@@ -39,20 +41,24 @@ def create_spotify_playlist(user, name, track_uris):
         "public": False,
     }
 
-    playlist = requests.post(
+    playlist_response = requests.post(
         f"{SPOTIFY_API}/users/{spotify_user_id}/playlists",
         headers=headers,
         json=payload,
         timeout=15,
-    ).json()
+    )
+    playlist_response.raise_for_status()
+    playlist = playlist_response.json()
 
     playlist_id = playlist["id"]
 
-    requests.post(
+    tracks_response = requests.post(
         f"{SPOTIFY_API}/playlists/{playlist_id}/tracks",
         headers=headers,
         json={"uris": track_uris},
         timeout=15,
     )
+
+    tracks_response.raise_for_status()
 
     return playlist
