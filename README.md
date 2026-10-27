@@ -39,4 +39,4 @@ Copying `.env.example` is handled by setup. Local `DEBUG=True` enables a develop
 ## Current Status / Limitations
 Optional Spotify export/OAuth needs credential-backed verification and further service decomposition. Recommendations are heuristic metadata scoring, not a validated machine-learning model. No preview downloads are stored. Rate limits, production deployment and password reset remain explicit follow-up work; no performance gains are claimed.
 
-See [AGENTS.md](AGENTS.md) and the GitHub readiness tracker before starting another improvement.
+See [AGENTS.md](AGENTS.md) and the GitHub readiness tracker before starting another improvement. [Dependency maintenance](docs/dependencies.md) records audit scope, compatible fixes and update checks.
